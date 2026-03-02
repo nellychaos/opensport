@@ -1,0 +1,63 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --font-inter: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Code block base styles */
+.code-block {
+  @apply bg-cream-100 border border-cream-200 rounded-xl p-5 overflow-x-auto text-sm font-mono leading-relaxed;
+}
+
+.code-line-comment { @apply text-stone-400; }
+.code-keyword      { @apply text-amber-600; }
+.code-string       { @apply text-green-700; }
+.code-var          { @apply text-stone-700; }
+.code-fn           { @apply text-blue-700; }
+.code-type         { @apply text-purple-700; }
+
+/* Docs prose */
+.prose-docs h2 {
+  @apply text-xl font-semibold text-stone-900 mt-10 mb-3 pt-8 border-t border-cream-200 first:border-0 first:pt-0 first:mt-0;
+}
+.prose-docs h3 {
+  @apply text-base font-semibold text-stone-800 mt-6 mb-2;
+}
+.prose-docs p {
+  @apply text-stone-600 leading-7 mb-4;
+}
+.prose-docs ul {
+  @apply list-disc list-inside space-y-1 mb-4 text-stone-600;
+}
+.prose-docs code {
+  @apply bg-cream-100 text-amber-700 px-1.5 py-0.5 rounded text-[0.85em] font-mono border border-cream-200;
+}
+.prose-docs pre {
+  @apply code-block mb-6;
+}
+.prose-docs pre code {
+  @apply bg-transparent border-0 px-0 py-0 text-stone-700;
+}
+.prose-docs a {
+  @apply text-amber-600 hover:text-amber-700 underline underline-offset-2;
+}
+.prose-docs table {
+  @apply w-full text-sm mb-6 border-collapse;
+}
+.prose-docs th {
+  @apply text-left text-xs font-semibold text-stone-500 uppercase tracking-wider pb-2 border-b border-cream-200;
+}
+.prose-docs td {
+  @apply py-2.5 pr-6 text-stone-600 border-b border-cream-100 align-top;
+}
+.prose-docs td:first-child {
+  @apply font-mono text-amber-700 text-xs;
+}
