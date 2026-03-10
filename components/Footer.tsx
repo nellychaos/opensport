@@ -13,6 +13,7 @@ export default function Footer() {
           <Link href="/docs/quickstart" className="hover:text-stone-600 transition-colors">Quickstart</Link>
           <Link href="/docs/architecture" className="hover:text-stone-600 transition-colors">Architecture</Link>
           <a href="https://github.com/opensport/opensport" target="_blank" rel="noopener noreferrer" className="hover:text-stone-600 transition-colors">GitHub</a>
+          <Link href="/llms.txt" className="hover:text-stone-600 transition-colors">llms.txt</Link>
         </nav>
       </div>
     </footer>

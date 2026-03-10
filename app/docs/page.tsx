@@ -54,6 +54,17 @@ export default function DocsPage() {
         A comprehensive set of <code>MarketType</code> slugs covers most use cases out of the box, including winner/moneyline, point spread, Asian handicap, totals/over-under, BTTS, correct score, player props (points, rebounds, passing yards, touchdowns), and race markets (win, place, each-way). A <code>CUSTOM</code> slug is available for provider-specific markets.
       </p>
 
+      <h2>Using Opensport with LLM agents</h2>
+      <p>
+        Opensport is designed to be called by AI agents. The <code>evaluate()</code> and <code>run()</code>
+        methods accept and return typed Python objects — straightforward to expose as tools in Claude tool use,
+        LangChain, LlamaIndex, or any agent framework. See the <Link href="/docs/agents">Agents reference</Link> for a full integration example.
+      </p>
+      <p>
+        This documentation is also available in plain text for LLM ingestion:
+        <code><Link href="/llms.txt">/llms.txt</Link></code> (index) and <code><Link href="/llms-full.txt">/llms-full.txt</Link></code> (full content).
+      </p>
+
       <h2>Next steps</h2>
       <p>
         The fastest path to your first position is the <Link href="/docs/quickstart">Quickstart guide</Link>. If you want to understand the full system design before diving in, read the <Link href="/docs/architecture">Architecture overview</Link>.
