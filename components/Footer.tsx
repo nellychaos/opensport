@@ -11,8 +11,8 @@ export default function Footer() {
         <nav className="flex items-center gap-6">
           <Link href="/docs" className="hover:text-stone-600 transition-colors">Docs</Link>
           <Link href="/docs/quickstart" className="hover:text-stone-600 transition-colors">Quickstart</Link>
-          <Link href="/docs/architecture" className="hover:text-stone-600 transition-colors">Architecture</Link>
-          <a href="https://github.com/opensport/opensport" target="_blank" rel="noopener noreferrer" className="hover:text-stone-600 transition-colors">GitHub</a>
+          <Link href="/demo" className="hover:text-stone-600 transition-colors">Demo</Link>
+          <a href="https://github.com/nellychaos/opensport" target="_blank" rel="noopener noreferrer" className="hover:text-stone-600 transition-colors">GitHub</a>
         </nav>
       </div>
     </footer>

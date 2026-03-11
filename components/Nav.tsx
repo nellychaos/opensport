@@ -6,7 +6,8 @@ import { usePathname } from "next/navigation";
 const NAV_LINKS = [
   { href: "/docs", label: "Docs" },
   { href: "/docs/quickstart", label: "Quickstart" },
-  { href: "https://github.com/opensport/opensport", label: "GitHub", external: true },
+  { href: "/demo", label: "Demo" },
+  { href: "https://github.com/nellychaos/opensport", label: "GitHub", external: true },
 ];
 
 export default function Nav() {
