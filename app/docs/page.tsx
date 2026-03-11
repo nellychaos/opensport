@@ -35,11 +35,14 @@ export default function DocsPage() {
           <tr><th>Capability</th><th>How</th></tr>
         </thead>
         <tbody>
-          <tr><td>get_events()</td><td>Pull upcoming or live events, filtered by sport, competition, or status</td></tr>
-          <tr><td>get_odds()</td><td>Fetch a full OddsSnapshot: all markets, all outcomes, implied probs</td></tr>
-          <tr><td>place(intent)</td><td>Execute a BetIntent against the Simulator or a live exchange</td></tr>
-          <tr><td>settle_event()</td><td>Bulk-settle all positions on an event by outcome label</td></tr>
-          <tr><td>agent.run()</td><td>Full evaluate loop: fetch, analyse, place, repeat</td></tr>
+          <tr><td><code>get_events()</code></td><td>Pull upcoming or live events, filtered by sport, competition, or status</td></tr>
+          <tr><td><code>find_events(team=)</code></td><td>Search events by team or player name (case-insensitive substring)</td></tr>
+          <tr><td><code>event.summary()</code></td><td>Compact one-line string for any event, ready for LLM context windows</td></tr>
+          <tr><td><code>get_odds()</code></td><td>Fetch a full OddsSnapshot: all markets, all outcomes, implied probs</td></tr>
+          <tr><td><code>get_value_bets()</code></td><td>Scan all events and return positive-EV outcomes sorted by edge</td></tr>
+          <tr><td><code>place(intent)</code></td><td>Execute a BetIntent against the Simulator or a live exchange</td></tr>
+          <tr><td><code>settle_event()</code></td><td>Bulk-settle all positions on an event by outcome label</td></tr>
+          <tr><td><code>agent.run()</code></td><td>Full evaluate loop: fetch, analyse, place, repeat</td></tr>
         </tbody>
       </table>
 

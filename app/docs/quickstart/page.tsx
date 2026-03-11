@@ -18,8 +18,15 @@ export default function QuickstartPage() {
       <h2>Python</h2>
 
       <h3>1. Install</h3>
-      <pre><code>{`cd Opensport/python
-pip install -r requirements.txt`}</code></pre>
+      <pre><code>{`pip install opensport`}</code></pre>
+
+      <p>
+        Requires Python 3.11+. Zero hard dependencies. Optional extras add HTTP providers:
+      </p>
+
+      <pre><code>{`pip install 'opensport[http]'    # PremierLeague, Stake, Cloudbet, Polymarket
+pip install 'opensport[massey]'  # MasseyRatings (NFL, NBA, MLB, NHL, NCAAF, NCAAB)
+pip install 'opensport[mcp]'     # MCP server`}</code></pre>
 
       <h3>2. Run the example agent</h3>
       <pre><code>{`import logging
@@ -30,7 +37,7 @@ from opensport.execution.simulator import Simulator
 from opensport.agents.example import ValueAgent
 from opensport.agents.base import AgentConfig
 
-provider = MockProvider()
+provider = MockProvider(seed=42)
 sim      = Simulator(bankroll=1_000.0)
 config   = AgentConfig(min_edge_pct=0.02, max_stake_pct=0.05)
 agent    = ValueAgent(provider=provider, execution=sim, config=config)
@@ -42,16 +49,34 @@ sim.print_summary()`}</code></pre>
       <pre><code>{`from opensport.providers.mock import MockProvider
 from opensport.utils.helpers import format_odds_table
 
-provider = MockProvider()
+provider = MockProvider(seed=42)
 
+# Print a compact summary of every event
 for event in provider.get_events():
-    print(event)
+    print(event.summary())
 
+# Filter by sport, then fetch odds
 soccer = provider.get_events(sport="soccer")
 snap   = provider.get_odds(soccer[0].id)
-print(format_odds_table(snap))`}</code></pre>
+print(format_odds_table(snap))
 
-      <h3>4. Place and settle a bet manually</h3>
+# Search by team name (case-insensitive substring)
+arsenal_games = provider.find_events(team="Arsenal")
+for e in arsenal_games:
+    print(e.summary())`}</code></pre>
+
+      <h3>4. Find value bets across all events</h3>
+      <pre><code>{`from opensport.providers.mock import MockProvider
+from opensport.utils import get_value_bets
+
+provider = MockProvider(seed=42)
+bets = get_value_bets(provider, sport="soccer", min_edge_pct=0.02)
+
+for b in bets:
+    print(f"{b['event_summary']}")
+    print(f"  {b['outcome_label']} @ {b['decimal_odds']:.2f}  edge={b['edge_pct']:.1f}%")`}</code></pre>
+
+      <h3>5. Place and settle a bet manually</h3>
       <pre><code>{`from opensport.core.position import BetIntent, Side
 from opensport.execution.simulator import Simulator
 
@@ -68,19 +93,19 @@ intent = BetIntent(
 )
 
 pos = sim.place(intent)
-print(f"Balance after placing: {sim.get_balance():.2f}")
+print(f"Balance after placing: {sim.get_balance():.2f}")   # 450.0
 
 sim.settle_position(pos.id, won=True)
-print(f"Balance after win: {sim.get_balance():.2f}")
+print(f"Balance after win: {sim.get_balance():.2f}")       # 555.0
 sim.print_summary()`}</code></pre>
 
-      <h3>5. Run the test suite</h3>
-      <pre><code>{`pytest tests/ -v`}</code></pre>
+      <h3>6. Run the test suite</h3>
+      <pre><code>{`python3.11 -m pytest tests/ -v`}</code></pre>
 
       <h2>TypeScript</h2>
 
       <h3>1. Install</h3>
-      <pre><code>{`cd Opensport/typescript
+      <pre><code>{`cd opensport-sdk/typescript
 npm install`}</code></pre>
 
       <h3>2. Run a quick demo</h3>
@@ -120,40 +145,18 @@ sim.printSummary();`}</code></pre>
       <h2>Connecting a real provider</h2>
       <p>
         Swap <code>MockProvider</code> for a real data source by implementing <code>BaseProvider</code>.
-        Your agent code stays identical.
+        Your agent code stays identical. See the <Link href="/docs/providers">Providers reference</Link>{" "}
+        for built-in providers and a full custom provider skeleton.
       </p>
-      <pre><code>{`from opensport.providers.base import BaseProvider
-from opensport.core.event import Event
-from opensport.core.odds import OddsSnapshot
-import httpx
-
-class TheOddsApiProvider(BaseProvider):
-    name = "the_odds_api"
-
-    def __init__(self, api_key: str):
-        self._client = httpx.Client(
-            base_url="https://api.the-odds-api.com/v4",
-            params={"apiKey": api_key},
-        )
-
-    def get_events(self, sport=None, **_) -> list[Event]:
-        resp = self._client.get(f"/sports/{sport}/events")
-        resp.raise_for_status()
-        return [self._parse_event(e) for e in resp.json()]
-
-    def get_odds(self, event_id: str) -> OddsSnapshot:
-        resp = self._client.get("/sports/odds", params={"eventIds": event_id})
-        resp.raise_for_status()
-        return self._parse_snapshot(resp.json()[0])`}</code></pre>
 
       <h2>Going live</h2>
       <p>
-        When you are ready to connect a real exchange, subclass <code>ExchangeExecutor</code> and implement three methods:
-        <code>_api_place_bet()</code>, <code>_api_cancel_order()</code>, and <code>_api_get_balance()</code>.
-        The executor has built-in risk guards (<code>max_single_stake</code>, <code>max_total_exposure</code>) and a <code>dry_run</code> mode so you can test without executing.
-      </p>
-      <p>
-        Read the <Link href="/docs/architecture">Architecture guide</Link> for a full breakdown of every layer.
+        When you are ready to connect a real exchange, subclass <code>ExchangeExecutor</code> and
+        implement three methods: <code>_api_place_bet()</code>, <code>_api_cancel_order()</code>,
+        and <code>_api_get_balance()</code>. Built-in risk guards (<code>max_single_stake</code>,{" "}
+        <code>max_total_exposure</code>) and a <code>dry_run</code> mode let you verify the wiring
+        before any real money moves. See the <Link href="/docs/execution">Execution reference</Link>{" "}
+        for the full guide.
       </p>
     </>
   );
