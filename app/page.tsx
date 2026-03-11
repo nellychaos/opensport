@@ -86,7 +86,7 @@ export default function HomePage() {
             Read the docs
           </Link>
           <a
-            href="https://github.com/opensport/opensport"
+            href="https://github.com/nellychaos/opensport"
             target="_blank"
             rel="noopener noreferrer"
             className="w-full sm:w-auto px-6 py-3 border border-stone-200 text-stone-700 rounded-xl font-medium text-sm hover:border-stone-300 hover:bg-stone-50 transition-colors"
