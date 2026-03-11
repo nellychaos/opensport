@@ -10,14 +10,14 @@ export default function ArchitecturePage() {
         <span className="text-xs font-semibold text-amber-600 uppercase tracking-widest">Concepts</span>
         <h1 className="text-3xl font-bold text-stone-900 mt-2 mb-3">Architecture</h1>
         <p className="text-stone-500 text-lg leading-relaxed">
-          Opensport is structured as four independent layers. Each is an abstract base class — swap any component without touching the others.
+          Opensport is structured as four independent layers. Each is an abstract base class. Swap any component without touching the others.
         </p>
       </div>
 
       <h2>Overview</h2>
       <p>
         The data flow is linear and unidirectional: a <strong>Provider</strong> fetches raw data, the <strong>Agent</strong> evaluates it and emits a <code>BetIntent</code>, and the <strong>Executor</strong> converts that intent into a <code>Position</code>.
-        All layers communicate through the <strong>Core models</strong> — pure data classes with no I/O.
+        All layers communicate through the <strong>Core models</strong>: pure data classes with no I/O.
       </p>
 
       <pre><code>{`Agent (strategy)
@@ -31,7 +31,7 @@ Provider (Events + Odds)
   ▼
 Core models (Event · OddsSnapshot · Position · ...)`}</code></pre>
 
-      <h2>Layer 1 — Core models</h2>
+      <h2>Layer 1: Core models</h2>
       <p>
         Located in <code>python/opensport/core/</code> and <code>typescript/src/core/</code>.
         These are immutable data classes with no I/O. All layers depend on them.
@@ -40,14 +40,14 @@ Core models (Event · OddsSnapshot · Position · ...)`}</code></pre>
       <table>
         <thead><tr><th>Model</th><th>Purpose</th></tr></thead>
         <tbody>
-          <tr><td>Event</td><td>A sporting event — sport, competition, teams, venue, start time, status, scores</td></tr>
+          <tr><td>Event</td><td>A sporting event: sport, competition, teams, venue, start time, status, scores</td></tr>
           <tr><td>Team / Venue</td><td>Participants and location metadata</td></tr>
-          <tr><td>Market</td><td>Market type metadata — type slug, handicap line, valid outcomes, status</td></tr>
+          <tr><td>Market</td><td>Market type metadata: type slug, handicap line, valid outcomes, status</td></tr>
           <tr><td>OutcomeOdds</td><td>A single price for a single outcome from a single bookmaker</td></tr>
-          <tr><td>MarketOdds</td><td>All outcome prices for one market — includes overround and best-odds helpers</td></tr>
+          <tr><td>MarketOdds</td><td>All outcome prices for one market, including overround and best-odds helpers</td></tr>
           <tr><td>OddsSnapshot</td><td>All markets for one event at one point in time</td></tr>
-          <tr><td>BetIntent</td><td>What an agent wants to do — not yet placed</td></tr>
-          <tr><td>Position</td><td>A placed and (eventually) settled bet — includes P&amp;L</td></tr>
+          <tr><td>BetIntent</td><td>What an agent wants to do, not yet placed</td></tr>
+          <tr><td>Position</td><td>A placed and eventually settled bet, including P&amp;L</td></tr>
         </tbody>
       </table>
 
@@ -57,7 +57,7 @@ Core models (Event · OddsSnapshot · Position · ...)`}</code></pre>
         Implied probability is always <code>1 / decimal_odds</code>.
       </p>
 
-      <h2>Layer 2 — Providers</h2>
+      <h2>Layer 2: Providers</h2>
       <p>
         A Provider fetches events and odds from a data source and normalises them into the core models.
         Implement <code>BaseProvider</code> to connect any feed.
@@ -74,19 +74,31 @@ Core models (Event · OddsSnapshot · Position · ...)`}</code></pre>
       <table>
         <thead><tr><th>Provider</th><th>Description</th></tr></thead>
         <tbody>
-          <tr><td>MockProvider</td><td>Fully in-memory, reproducible via seed, no API key needed</td></tr>
+          <tr><td>MockProvider</td><td>Fully in-memory, reproducible via seed. No API key, no network.</td></tr>
+          <tr><td>PremierLeagueProvider</td><td>English Premier League: fixtures, scores, and odds from Football-Data.org + The Odds API (both free)</td></tr>
+          <tr><td>MasseyRatingsProvider</td><td>NFL, NBA, MLB, NHL, NCAAF, NCAAB. Schedules, scores, and model-derived win-probability odds. No API key.</td></tr>
+          <tr><td>StakeProvider</td><td>20+ sports + esports. Live bookmaker odds from Stake.com.</td></tr>
+          <tr><td>CloudbetProvider</td><td>20+ sports. Live bookmaker odds from Cloudbet.com (free affiliate key available)</td></tr>
+          <tr><td>PolymarketProvider</td><td>10+ sports. Consensus probabilities from Polymarket prediction markets. No API key required.</td></tr>
         </tbody>
       </table>
 
-      <h3>Building a real provider</h3>
+      <h3>Managing multiple providers</h3>
       <p>
-        Subclass <code>BaseProvider</code>, implement <code>get_events()</code> and <code>get_odds()</code>, and map your data source's native response objects into the core models. See the <Link href="/docs/quickstart">Quickstart</Link> for a full example using The Odds API.
+        Use <code>ProviderRegistry</code> to track which providers are active and <code>MultiProvider</code> to expose all of them through a single <code>BaseProvider</code> interface.
+        Because <code>MultiProvider</code> <em>is</em> a <code>BaseProvider</code>, agent code requires no changes.
+        See the <Link href="/docs/providers">Providers reference</Link> for full examples and constructor options.
       </p>
 
-      <h2>Layer 3 — Execution</h2>
+      <h3>Building a custom provider</h3>
+      <p>
+        Subclass <code>BaseProvider</code>, implement <code>get_events()</code> and <code>get_odds()</code>, and map your data source&apos;s native response objects into the core models. See the <Link href="/docs/providers">Providers reference</Link> for a full skeleton.
+      </p>
+
+      <h2>Layer 3: Execution</h2>
       <p>
         An Executor accepts a <code>BetIntent</code> and returns a <code>Position</code>.
-        The same agent code runs against the Simulator (paper trading) or a live exchange — just swap the executor.
+        The same agent code runs against the Simulator (paper trading) or a live exchange. Just swap the executor.
       </p>
 
       <pre><code>{`class BaseExecutor(ABC):
@@ -98,19 +110,19 @@ Core models (Event · OddsSnapshot · Position · ...)`}</code></pre>
       <table>
         <thead><tr><th>Executor</th><th>Description</th></tr></thead>
         <tbody>
-          <tr><td>Simulator</td><td>Paper trading — tracks P&amp;L in memory, supports commission, full settlement helpers</td></tr>
+          <tr><td>Simulator</td><td>Paper trading: tracks P&amp;L in memory, supports commission, full settlement helpers</td></tr>
           <tr><td>ExchangeExecutor</td><td>Abstract skeleton with risk guards and dry-run mode for live exchange connectors</td></tr>
         </tbody>
       </table>
 
       <h3>Risk guards in ExchangeExecutor</h3>
       <ul>
-        <li><code>max_single_stake</code> — hard cap on any single bet</li>
-        <li><code>max_total_exposure</code> — abort if aggregate open stakes exceed limit</li>
-        <li><code>dry_run=True</code> — log intended actions without calling the exchange API</li>
+        <li><code>max_single_stake</code>: hard cap on any single bet</li>
+        <li><code>max_total_exposure</code>: abort if aggregate open stakes exceed limit</li>
+        <li><code>dry_run=True</code>: log intended actions without calling the exchange API</li>
       </ul>
 
-      <h2>Layer 4 — Agents</h2>
+      <h2>Layer 4: Agents</h2>
       <p>
         An Agent orchestrates the evaluate → place loop. Subclass <code>BaseAgent</code> and implement <code>evaluate()</code>.
         The base class handles fetching, stake clamping, open-position limits, and error recovery.
@@ -123,7 +135,7 @@ Core models (Event · OddsSnapshot · Position · ...)`}</code></pre>
       <table>
         <thead><tr><th>AgentConfig param</th><th>Default</th><th>Description</th></tr></thead>
         <tbody>
-          <tr><td>bankroll</td><td>1000</td><td>Current balance — used for Kelly sizing</td></tr>
+          <tr><td>bankroll</td><td>1000</td><td>Current balance, used for Kelly sizing</td></tr>
           <tr><td>max_stake_pct</td><td>0.05</td><td>Max 5% of bankroll per bet (safety clamp)</td></tr>
           <tr><td>min_edge_pct</td><td>0.03</td><td>Minimum positive edge required to act</td></tr>
           <tr><td>max_open_positions</td><td>10</td><td>Stop placing when this many positions are open</td></tr>

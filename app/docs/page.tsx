@@ -20,13 +20,13 @@ export default function DocsPage() {
         It ships in <strong>Python</strong> (for strategy logic and modelling) and <strong>TypeScript</strong> (for API layers and real-time feeds), with the same concepts and structure across both.
       </p>
       <p>
-        The framework is built around four clean layers — each an abstract base class you can swap independently:
+        The framework is built around four clean layers, each an abstract base class you can swap independently:
       </p>
       <ul>
-        <li><strong>Core models</strong> — <code>Event</code>, <code>Market</code>, <code>OddsSnapshot</code>, <code>BetIntent</code>, <code>Position</code></li>
-        <li><strong>Provider</strong> — fetches events and odds from any data source</li>
-        <li><strong>Executor</strong> — places positions, simulated or live</li>
-        <li><strong>Agent</strong> — your strategy logic, wired to provider + executor</li>
+        <li><strong>Core models</strong>: <code>Event</code>, <code>Market</code>, <code>OddsSnapshot</code>, <code>BetIntent</code>, <code>Position</code></li>
+        <li><strong>Provider</strong>: fetches events and odds from any data source</li>
+        <li><strong>Executor</strong>: places positions, simulated or live</li>
+        <li><strong>Agent</strong>: your strategy logic, wired to provider + executor</li>
       </ul>
 
       <h2>Key capabilities</h2>
@@ -36,10 +36,10 @@ export default function DocsPage() {
         </thead>
         <tbody>
           <tr><td>get_events()</td><td>Pull upcoming or live events, filtered by sport, competition, or status</td></tr>
-          <tr><td>get_odds()</td><td>Fetch a full OddsSnapshot — all markets, all outcomes, implied probs</td></tr>
+          <tr><td>get_odds()</td><td>Fetch a full OddsSnapshot: all markets, all outcomes, implied probs</td></tr>
           <tr><td>place(intent)</td><td>Execute a BetIntent against the Simulator or a live exchange</td></tr>
           <tr><td>settle_event()</td><td>Bulk-settle all positions on an event by outcome label</td></tr>
-          <tr><td>agent.run()</td><td>Full evaluate loop — fetch, analyse, place, repeat</td></tr>
+          <tr><td>agent.run()</td><td>Full evaluate loop: fetch, analyse, place, repeat</td></tr>
         </tbody>
       </table>
 
