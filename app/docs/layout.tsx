@@ -23,6 +23,7 @@ const SIDEBAR = [
       { href: "/docs/providers", label: "Providers" },
       { href: "/docs/execution", label: "Execution" },
       { href: "/docs/agents", label: "Agents" },
+      { href: "/docs/mcp", label: "MCP Server" },
     ],
   },
 ];
