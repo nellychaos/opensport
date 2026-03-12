@@ -194,7 +194,7 @@ const DEMOS: Demo[] = [
     id: "events",
     title: "Upcoming fixtures",
     badge: "get_events()",
-    description: "Fetch the next Premier League matchweek — all eight scheduled kick-offs.",
+    description: "Fetch the next Premier League matchweek — all ten Matchweek 30 fixtures.",
     action: "events",
     codeLines: [
       <><Kw c="from" /> opensport.providers.mock <Kw c="import" /> MockProvider</>,
@@ -218,7 +218,7 @@ const DEMOS: Demo[] = [
     badge: "get_odds()",
     description: "Fan out to Cloudbet, Stake, and Polymarket and surface the best available price for each outcome.",
     action: "odds",
-    params: { event_id: "pl_001" },
+    params: { event_id: "pl_009" },
     codeLines: [
       <><Kw c="from" /> opensport.providers <Kw c="import" /> ProviderRegistry, MultiProvider</>,
       <>&nbsp;</>,
@@ -227,7 +227,7 @@ const DEMOS: Demo[] = [
       <>provider = <Fn c="MultiProvider" />(registry)</>,
       <>&nbsp;</>,
       <><Cm c="# get_odds() fans out to all active bookmakers" /></>,
-      <>snap = provider.<Fn c="get_odds" />(<St c='"pl_001"' />)  <Cm c="# Arsenal vs Chelsea" /></>,
+      <>snap = provider.<Fn c="get_odds" />(<St c='"pl_009"' />)  <Cm c="# Liverpool vs Tottenham" /></>,
       <>&nbsp;</>,
       <><Kw c="for" /> market <Kw c="in" /> snap.markets:</>,
       <>{"    "}<Kw c="for" /> o <Kw c="in" /> market.outcomes:</>,
