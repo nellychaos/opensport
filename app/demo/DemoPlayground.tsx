@@ -216,9 +216,8 @@ const DEMOS: Demo[] = [
     id: "odds",
     title: "Compare bookmaker prices",
     badge: "get_odds()",
-    description: "Fan out to Cloudbet, Stake, and Polymarket and surface the best available price for each outcome.",
+    description: "Fan out to Cloudbet, Stake, and Polymarket and surface the best available price for each outcome. Fetches the next scheduled PL match live.",
     action: "odds",
-    params: { event_id: "pl_009" },
     codeLines: [
       <><Kw c="from" /> opensport.providers <Kw c="import" /> ProviderRegistry, MultiProvider</>,
       <>&nbsp;</>,
@@ -227,7 +226,8 @@ const DEMOS: Demo[] = [
       <>provider = <Fn c="MultiProvider" />(registry)</>,
       <>&nbsp;</>,
       <><Cm c="# get_odds() fans out to all active bookmakers" /></>,
-      <>snap = provider.<Fn c="get_odds" />(<St c='"pl_009"' />)  <Cm c="# Liverpool vs Tottenham" /></>,
+      <>events  = provider.<Fn c="get_events" />(sport=<St c='"soccer"' />, status=<St c='"scheduled"' />)</>,
+      <>snap    = provider.<Fn c="get_odds" />(events[<Nm c="0" />].id)  <Cm c="# next match" /></>,
       <>&nbsp;</>,
       <><Kw c="for" /> market <Kw c="in" /> snap.markets:</>,
       <>{"    "}<Kw c="for" /> o <Kw c="in" /> market.outcomes:</>,
@@ -309,9 +309,24 @@ function IconSpinner() {
 }
 
 // ── DemoCard ────────────────────────────────────────────────────────────────
+function DataBadge({ live }: { live: boolean }) {
+  return live ? (
+    <span className="flex items-center gap-1 text-[11px] font-medium text-green-700 bg-green-50 border border-green-200 px-2 py-0.5 rounded-full">
+      <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+      Live
+    </span>
+  ) : (
+    <span className="flex items-center gap-1 text-[11px] font-medium text-amber-700 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-full">
+      <span className="w-1.5 h-1.5 rounded-full bg-amber-400" />
+      Mock
+    </span>
+  );
+}
+
 function DemoCard({ demo }: { demo: Demo }) {
   const [state, setState] = useState<DemoState>("idle");
   const [result, setResult] = useState<unknown>(null);
+  const [isLive, setIsLive] = useState<boolean | null>(null);
 
   const run = useCallback(async () => {
     setState("loading");
@@ -321,6 +336,7 @@ function DemoCard({ demo }: { demo: Demo }) {
       const json = await res.json();
       if (!json.ok) throw new Error(json.error ?? "API error");
       setResult(json.data);
+      setIsLive(json.live ?? false);
       setState("done");
     } catch {
       setState("error");
@@ -344,7 +360,6 @@ function DemoCard({ demo }: { demo: Demo }) {
 
       {/* Code panel */}
       <div className="bg-stone-950 px-5 py-4 text-xs font-mono leading-[1.65] overflow-x-auto">
-        {/* Fake traffic-light dots */}
         <div className="flex items-center gap-1.5 mb-3 opacity-40">
           <span className="w-2.5 h-2.5 rounded-full bg-stone-600" />
           <span className="w-2.5 h-2.5 rounded-full bg-stone-600" />
@@ -375,8 +390,14 @@ function DemoCard({ demo }: { demo: Demo }) {
         </button>
 
         {state === "done" && result !== null && (
-          <div className="bg-stone-50 rounded-xl p-3 border border-stone-100 overflow-auto max-h-72">
-            {demo.renderOutput(result)}
+          <div className="bg-stone-50 rounded-xl border border-stone-100 overflow-hidden">
+            <div className="flex items-center justify-between px-3 py-2 border-b border-stone-100">
+              <span className="text-xs text-stone-400">Output</span>
+              {isLive !== null && <DataBadge live={isLive} />}
+            </div>
+            <div className="p-3 overflow-auto max-h-72">
+              {demo.renderOutput(result)}
+            </div>
           </div>
         )}
 

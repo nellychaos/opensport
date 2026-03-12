@@ -1,224 +1,348 @@
 import { NextRequest, NextResponse } from "next/server";
 
-// ── Matchweek 30 fixtures (14–16 Mar 2026) ──────────────────────────────────
-// Kick-off times are stored as [dayOffset from Saturday, hour, minute] in GMT.
+// ── Env vars ─────────────────────────────────────────────────────────────────
+const FBD_KEY  = process.env.FOOTBALL_DATA_API_KEY;  // Football-Data.org
+const ODDS_KEY = process.env.ODDS_API_KEY;            // The Odds API
 
-const FIXTURES = [
-  { id: "pl_001", home: "Burnley",            away: "Bournemouth",   competition: "Premier League", ko: [0, 15,  0] },
-  { id: "pl_002", home: "Sunderland",         away: "Brighton",      competition: "Premier League", ko: [0, 15,  0] },
-  { id: "pl_003", home: "Chelsea",            away: "Newcastle",     competition: "Premier League", ko: [0, 17, 30] },
-  { id: "pl_004", home: "Arsenal",            away: "Everton",       competition: "Premier League", ko: [0, 17, 30] },
-  { id: "pl_005", home: "West Ham",           away: "Man City",      competition: "Premier League", ko: [0, 20,  0] },
-  { id: "pl_006", home: "Crystal Palace",     away: "Leeds United",  competition: "Premier League", ko: [1, 14,  0] },
-  { id: "pl_007", home: "Manchester United",  away: "Aston Villa",   competition: "Premier League", ko: [1, 14,  0] },
-  { id: "pl_008", home: "Nottingham Forest",  away: "Fulham",        competition: "Premier League", ko: [1, 14,  0] },
-  { id: "pl_009", home: "Liverpool",          away: "Tottenham",     competition: "Premier League", ko: [1, 16, 30] },
-  { id: "pl_010", home: "Brentford",          away: "Wolves",        competition: "Premier League", ko: [2, 20,  0] },
-];
+// ── External API types ────────────────────────────────────────────────────────
 
-// ── Date helpers ────────────────────────────────────────────────────────────
-
-/** Returns the next upcoming Saturday (or the Saturday after, if today is Saturday). */
-function nextSaturday(): Date {
-  const now = new Date();
-  const daysUntilSat = ((6 - now.getDay()) + 7) % 7 || 7;
-  const sat = new Date(now);
-  sat.setDate(now.getDate() + daysUntilSat);
-  sat.setHours(0, 0, 0, 0);
-  return sat;
+interface FbdTeam   { id: number; name: string; shortName: string; tla: string }
+interface FbdScore  { fullTime: { home: number | null; away: number | null } }
+interface FbdMatch  {
+  id: number;
+  utcDate: string;
+  status: string;
+  matchday: number;
+  homeTeam: FbdTeam;
+  awayTeam: FbdTeam;
+  score: FbdScore;
 }
 
-function kickoffDate(sat: Date, offsetDays: number, hour: number, min: number): Date {
-  const d = new Date(sat);
-  d.setDate(sat.getDate() + offsetDays);
-  d.setUTCHours(hour, min, 0, 0);
-  return d;
+interface OddsOutcome   { name: string; price: number }
+interface OddsMarket    { key: string; outcomes: OddsOutcome[] }
+interface OddsBookmaker { key: string; title: string; markets: OddsMarket[] }
+interface OddsEvent     {
+  id: string;
+  home_team: string;
+  away_team: string;
+  commence_time: string;
+  bookmakers: OddsBookmaker[];
 }
 
-function fmtTime(d: Date): string {
-  return d.toISOString().slice(0, 16).replace("T", " ") + " GMT";
+// ── Utilities ─────────────────────────────────────────────────────────────────
+
+function fmtUtc(iso: string): string {
+  return iso.slice(0, 16).replace("T", " ") + " UTC";
 }
 
-// ── Action handlers ─────────────────────────────────────────────────────────
-
-function handleEvents() {
-  const sat = nextSaturday();
-  return FIXTURES.map((f) => {
-    const [day, h, m] = f.ko;
-    const kickoff = kickoffDate(sat, day, h, m);
-    return {
-      id:          f.id,
-      sport:       "soccer",
-      competition: f.competition,
-      name:        `${f.home} vs ${f.away}`,
-      start_time:  fmtTime(kickoff),
-      status:      "scheduled",
-      home_team:   f.home,
-      away_team:   f.away,
-      summary:     `${f.home} vs ${f.away} | ${f.competition} | ${fmtTime(kickoff)} | SCHEDULED`,
-    };
-  });
+/** Strip vig: normalise implied probs so they sum to 1. */
+function removeVig(prices: number[]): number[] {
+  const implied = prices.map((p) => 1 / p);
+  const total   = implied.reduce((a, b) => a + b, 0);
+  return implied.map((p) => p / total);
 }
 
-function handleOdds(eventId: string) {
-  // Default to the Liverpool vs Tottenham marquee game
-  const event = FIXTURES.find((f) => f.id === eventId) ?? FIXTURES[8];
+// ── Live API fetchers (cached 5 min) ──────────────────────────────────────────
 
-  // Odds calibrated per match-up; fall back to generic spread for non-featured events
-  const oddsMap: Record<string, { home: number; draw: number; away: number }[]> = {
-    pl_009: [  // Liverpool vs Tottenham
-      { home: 1.60, draw: 4.20, away: 5.00 },  // Cloudbet
-      { home: 1.57, draw: 4.30, away: 5.20 },  // Stake
-      { home: 1.62, draw: 4.10, away: 4.90 },  // Polymarket
-    ],
-    pl_004: [  // Arsenal vs Everton
-      { home: 1.35, draw: 5.00, away: 8.50 },
-      { home: 1.33, draw: 5.20, away: 8.80 },
-      { home: 1.36, draw: 4.90, away: 8.40 },
-    ],
-    pl_005: [  // West Ham vs Man City
-      { home: 2.60, draw: 3.30, away: 2.70 },
-      { home: 2.55, draw: 3.40, away: 2.75 },
-      { home: 2.65, draw: 3.25, away: 2.68 },
-    ],
-    pl_007: [  // Man Utd vs Aston Villa
-      { home: 2.20, draw: 3.40, away: 3.20 },
-      { home: 2.15, draw: 3.50, away: 3.30 },
-      { home: 2.25, draw: 3.35, away: 3.15 },
-    ],
+async function fetchFbdMatches(): Promise<FbdMatch[]> {
+  if (!FBD_KEY) return [];
+  try {
+    const res = await fetch(
+      "https://api.football-data.org/v4/competitions/PL/matches?status=SCHEDULED&limit=15",
+      { headers: { "X-Auth-Token": FBD_KEY }, next: { revalidate: 300 } }
+    );
+    if (!res.ok) return [];
+    const json = await res.json();
+    return (json.matches ?? []) as FbdMatch[];
+  } catch { return []; }
+}
+
+async function fetchOddsEvents(): Promise<OddsEvent[]> {
+  if (!ODDS_KEY) return [];
+  try {
+    const qs = new URLSearchParams({
+      apiKey: ODDS_KEY, regions: "uk", markets: "h2h", oddsFormat: "decimal",
+    });
+    const res = await fetch(
+      `https://api.the-odds-api.com/v4/sports/soccer_epl/odds/?${qs}`,
+      { next: { revalidate: 300 } }
+    );
+    if (!res.ok) return [];
+    return await res.json() as OddsEvent[];
+  } catch { return []; }
+}
+
+// ── Live handlers ─────────────────────────────────────────────────────────────
+
+function mapFbdToEvent(m: FbdMatch) {
+  return {
+    id:          `fbd-${m.id}`,
+    sport:       "soccer",
+    competition: "Premier League",
+    name:        `${m.homeTeam.shortName} vs ${m.awayTeam.shortName}`,
+    start_time:  fmtUtc(m.utcDate),
+    status:      m.status.toLowerCase(),
+    home_team:   m.homeTeam.name,
+    away_team:   m.awayTeam.name,
+    summary:     `${m.homeTeam.name} vs ${m.awayTeam.name} | Premier League | ${fmtUtc(m.utcDate)} | ${m.status}`,
   };
+}
 
-  const rows = oddsMap[event.id] ?? [
-    { home: 2.10, draw: 3.40, away: 3.60 },
-    { home: 2.05, draw: 3.45, away: 3.70 },
-    { home: 2.15, draw: 3.35, away: 3.55 },
-  ];
+async function liveEvents() {
+  const matches = await fetchFbdMatches();
+  if (matches.length === 0) return null;
+  return matches.slice(0, 10).map(mapFbdToEvent);
+}
 
-  const bookmakers = ["Cloudbet", "Stake", "Polymarket"];
-  const outcomes = bookmakers.flatMap((bm, i) => [
-    { bookmaker: bm, label: "Home", decimal_odds: rows[i].home, is_available: true },
-    { bookmaker: bm, label: "Draw", decimal_odds: rows[i].draw, is_available: true },
-    { bookmaker: bm, label: "Away", decimal_odds: rows[i].away, is_available: true },
-  ]);
+async function liveOdds() {
+  const events = await fetchOddsEvents();
+  if (events.length === 0) return null;
 
-  // Compute best per label
+  // Pick the soonest upcoming event with ≥ 3 bookmakers
+  const now = Date.now();
+  const event = events
+    .filter((e) => new Date(e.commence_time).getTime() > now && e.bookmakers.length >= 3)
+    .sort((a, b) => new Date(a.commence_time).getTime() - new Date(b.commence_time).getTime())[0];
+  if (!event) return null;
+
+  const bms = event.bookmakers.slice(0, 3);
+  const outcomes = bms.flatMap((bm) => {
+    const market = bm.markets.find((m) => m.key === "h2h");
+    if (!market) return [];
+    return market.outcomes.map((o) => ({
+      bookmaker:    bm.title,
+      label:        o.name === event.home_team ? "Home" : o.name === "Draw" ? "Draw" : "Away",
+      decimal_odds: o.price,
+      is_available: true,
+    }));
+  });
+
   const labels = ["Home", "Draw", "Away"] as const;
   const best: Record<string, { odds: number; bookmaker: string }> = {};
   for (const label of labels) {
-    const candidates = outcomes.filter((o) => o.label === label);
-    const top = candidates.reduce((a, b) => (b.decimal_odds > a.decimal_odds ? b : a));
-    best[label] = { odds: top.decimal_odds, bookmaker: top.bookmaker };
+    const pool = outcomes.filter((o) => o.label === label);
+    if (pool.length > 0) {
+      const top = pool.reduce((a, b) => (b.decimal_odds > a.decimal_odds ? b : a));
+      best[label] = { odds: top.decimal_odds, bookmaker: top.bookmaker };
+    }
   }
 
   return {
     event_id: event.id,
-    match:    `${event.home} vs ${event.away}`,
+    match:    `${event.home_team} vs ${event.away_team}`,
     markets:  [{ market_type: "winner", outcomes, best }],
   };
 }
 
-function handleValueBets() {
-  const sat = nextSaturday();
+async function liveValueBets(minEdgePct: number) {
+  const events = await fetchOddsEvents();
+  if (events.length === 0) return null;
 
-  function ko(fixture: typeof FIXTURES[0]): string {
-    const [day, h, m] = fixture.ko;
-    return fmtTime(kickoffDate(sat, day, h, m));
+  const now     = Date.now();
+  const results: Array<{
+    event_id: string; event_summary: string; market_type: string;
+    outcome_label: string; decimal_odds: number; fair_prob: number;
+    edge_pct: number; bookmaker: string;
+  }> = [];
+
+  for (const event of events.filter((e) => new Date(e.commence_time).getTime() > now)) {
+    // Collect each bookmaker's h2h prices
+    const rows = event.bookmakers
+      .map((bm) => {
+        const mkt = bm.markets.find((m) => m.key === "h2h");
+        if (!mkt || mkt.outcomes.length < 3) return null;
+        const home = mkt.outcomes.find((o) => o.name === event.home_team);
+        const draw = mkt.outcomes.find((o) => o.name === "Draw");
+        const away = mkt.outcomes.find((o) => o.name === event.away_team);
+        if (!home || !draw || !away) return null;
+        return { bm: bm.title, home: home.price, draw: draw.price, away: away.price };
+      })
+      .filter(Boolean) as Array<{ bm: string; home: number; draw: number; away: number }>;
+
+    if (rows.length < 2) continue;
+
+    // Consensus fair probability = average devigged implied probs across bookmakers
+    let fairHome = 0, fairDraw = 0, fairAway = 0;
+    for (const r of rows) {
+      const [ph, pd, pa] = removeVig([r.home, r.draw, r.away]);
+      fairHome += ph; fairDraw += pd; fairAway += pa;
+    }
+    fairHome /= rows.length; fairDraw /= rows.length; fairAway /= rows.length;
+
+    // Best available odds across all bookmakers per outcome
+    const bestHome = rows.reduce((a, b) => (b.home > a.home ? b : a));
+    const bestDraw = rows.reduce((a, b) => (b.draw > a.draw ? b : a));
+    const bestAway = rows.reduce((a, b) => (b.away > a.away ? b : a));
+
+    const startTime = fmtUtc(event.commence_time);
+    const summary   = `${event.home_team} vs ${event.away_team} | Premier League | ${startTime} | SCHEDULED`;
+
+    for (const [label, fairProb, bestOdds, bmName] of [
+      ["Home", fairHome, bestHome.home, bestHome.bm],
+      ["Draw", fairDraw, bestDraw.draw, bestDraw.bm],
+      ["Away", fairAway, bestAway.away, bestAway.bm],
+    ] as [string, number, number, string][]) {
+      const edgePct = Math.round((fairProb * bestOdds - 1) * 1000) / 10;
+      if (edgePct >= minEdgePct) {
+        results.push({
+          event_id:      event.id,
+          event_summary: summary,
+          market_type:   "winner",
+          outcome_label: label,
+          decimal_odds:  Math.round(bestOdds * 100) / 100,
+          fair_prob:     Math.round(fairProb * 10000) / 10000,
+          edge_pct:      edgePct,
+          bookmaker:     bmName,
+        });
+      }
+    }
   }
 
-  // edge_pct = (fair_prob × decimal_odds - 1) × 100  — all verified below
-  const raw = [
-    {
-      event_id:      "pl_005",
-      event_summary: `West Ham vs Man City | Premier League | ${ko(FIXTURES[4])} | SCHEDULED`,
-      market_type:   "winner",
-      outcome_label: "Away",            // Man City Away — mkt overestimates City's slump
-      decimal_odds:  3.20,
-      fair_prob:     0.370,             // 3.20 × 0.370 − 1 = 18.4%
-      edge_pct:      18.4,
-      bookmaker:     "Cloudbet",
-    },
-    {
-      event_id:      "pl_009",
-      event_summary: `Liverpool vs Tottenham | Premier League | ${ko(FIXTURES[8])} | SCHEDULED`,
-      market_type:   "winner",
-      outcome_label: "Away",            // Spurs Away — inflated due to Liverpool hype
-      decimal_odds:  4.50,
-      fair_prob:     0.260,             // 4.50 × 0.260 − 1 = 17.0%
-      edge_pct:      17.0,
-      bookmaker:     "Stake",
-    },
-    {
-      event_id:      "pl_007",
-      event_summary: `Manchester United vs Aston Villa | Premier League | ${ko(FIXTURES[6])} | SCHEDULED`,
-      market_type:   "winner",
-      outcome_label: "Away",            // Villa Away undervalued at Old Trafford
-      decimal_odds:  2.90,
-      fair_prob:     0.380,             // 2.90 × 0.380 − 1 = 10.2%
-      edge_pct:      10.2,
-      bookmaker:     "Polymarket",
-    },
-    {
-      event_id:      "pl_003",
-      event_summary: `Chelsea vs Newcastle | Premier League | ${ko(FIXTURES[2])} | SCHEDULED`,
-      market_type:   "winner",
-      outcome_label: "Draw",            // Draw value — tight derby history
-      decimal_odds:  3.70,
-      fair_prob:     0.295,             // 3.70 × 0.295 − 1 = 9.2%
-      edge_pct:      9.2,
-      bookmaker:     "Cloudbet",
-    },
-  ];
-
-  // Already sorted desc by edge_pct
-  return raw;
+  return results.sort((a, b) => b.edge_pct - a.edge_pct).slice(0, 6);
 }
 
-function handleFindEvents(team: string) {
-  const sat = nextSaturday();
+async function liveFindEvents(team: string) {
+  const matches = await fetchFbdMatches();
+  if (matches.length === 0) return null;
   const q = team.toLowerCase();
+  return matches
+    .filter((m) => {
+      const h = `${m.homeTeam.name} ${m.homeTeam.shortName}`.toLowerCase();
+      const a = `${m.awayTeam.name} ${m.awayTeam.shortName}`.toLowerCase();
+      return h.includes(q) || a.includes(q);
+    })
+    .slice(0, 5)
+    .map(mapFbdToEvent);
+}
 
-  return FIXTURES
+// ── Mock fallback data (Matchweek 30, 14–16 Mar 2026) ────────────────────────
+
+const MOCK_FIXTURES = [
+  { id: "pl_001", home: "Burnley",           away: "Bournemouth",  ko: [0, 15,  0] },
+  { id: "pl_002", home: "Sunderland",        away: "Brighton",     ko: [0, 15,  0] },
+  { id: "pl_003", home: "Chelsea",           away: "Newcastle",    ko: [0, 17, 30] },
+  { id: "pl_004", home: "Arsenal",           away: "Everton",      ko: [0, 17, 30] },
+  { id: "pl_005", home: "West Ham",          away: "Man City",     ko: [0, 20,  0] },
+  { id: "pl_006", home: "Crystal Palace",    away: "Leeds United", ko: [1, 14,  0] },
+  { id: "pl_007", home: "Manchester United", away: "Aston Villa",  ko: [1, 14,  0] },
+  { id: "pl_008", home: "Nottingham Forest", away: "Fulham",       ko: [1, 14,  0] },
+  { id: "pl_009", home: "Liverpool",         away: "Tottenham",    ko: [1, 16, 30] },
+  { id: "pl_010", home: "Brentford",         away: "Wolves",       ko: [2, 20,  0] },
+] as const;
+
+function nextSaturday(): Date {
+  const now = new Date();
+  const d   = ((6 - now.getDay()) + 7) % 7 || 7;
+  const sat = new Date(now);
+  sat.setDate(now.getDate() + d);
+  sat.setUTCHours(0, 0, 0, 0);
+  return sat;
+}
+
+function mockKickoff(sat: Date, day: number, h: number, m: number): string {
+  const d = new Date(sat);
+  d.setDate(sat.getDate() + day);
+  d.setUTCHours(h, m, 0, 0);
+  return fmtUtc(d.toISOString());
+}
+
+function getMockEvents() {
+  const sat = nextSaturday();
+  return MOCK_FIXTURES.map((f) => {
+    const [day, h, m] = f.ko;
+    const t = mockKickoff(sat, day, h, m);
+    return { id: f.id, sport: "soccer", competition: "Premier League",
+      name: `${f.home} vs ${f.away}`, start_time: t, status: "scheduled",
+      home_team: f.home, away_team: f.away,
+      summary: `${f.home} vs ${f.away} | Premier League | ${t} | SCHEDULED` };
+  });
+}
+
+function getMockOdds() {
+  const f = MOCK_FIXTURES[8]; // Liverpool vs Tottenham
+  const bms = [
+    { name: "Cloudbet",   home: 1.60, draw: 4.20, away: 5.00 },
+    { name: "Stake",      home: 1.57, draw: 4.30, away: 5.20 },
+    { name: "Polymarket", home: 1.62, draw: 4.10, away: 4.90 },
+  ];
+  const outcomes = bms.flatMap((b) => [
+    { bookmaker: b.name, label: "Home", decimal_odds: b.home, is_available: true },
+    { bookmaker: b.name, label: "Draw", decimal_odds: b.draw, is_available: true },
+    { bookmaker: b.name, label: "Away", decimal_odds: b.away, is_available: true },
+  ]);
+  return {
+    event_id: "pl_009",
+    match:    `${f.home} vs ${f.away}`,
+    markets:  [{ market_type: "winner", outcomes,
+      best: { Home: { odds: 1.62, bookmaker: "Polymarket" },
+              Draw: { odds: 4.30, bookmaker: "Stake" },
+              Away: { odds: 5.20, bookmaker: "Stake" } } }],
+  };
+}
+
+function getMockValueBets() {
+  const sat = nextSaturday();
+  const ko  = (i: number) => { const [d,h,m] = MOCK_FIXTURES[i].ko; return mockKickoff(sat,d,h,m); };
+  return [
+    { event_id: "pl_005", market_type: "winner", outcome_label: "Away",
+      decimal_odds: 3.20, fair_prob: 0.3700, edge_pct: 18.4, bookmaker: "Cloudbet",
+      event_summary: `West Ham vs Man City | Premier League | ${ko(4)} | SCHEDULED` },
+    { event_id: "pl_009", market_type: "winner", outcome_label: "Away",
+      decimal_odds: 4.50, fair_prob: 0.2600, edge_pct: 17.0, bookmaker: "Stake",
+      event_summary: `Liverpool vs Tottenham | Premier League | ${ko(8)} | SCHEDULED` },
+    { event_id: "pl_007", market_type: "winner", outcome_label: "Away",
+      decimal_odds: 2.90, fair_prob: 0.3800, edge_pct: 10.2, bookmaker: "Polymarket",
+      event_summary: `Manchester United vs Aston Villa | Premier League | ${ko(6)} | SCHEDULED` },
+    { event_id: "pl_003", market_type: "winner", outcome_label: "Draw",
+      decimal_odds: 3.70, fair_prob: 0.2950, edge_pct: 9.2, bookmaker: "Cloudbet",
+      event_summary: `Chelsea vs Newcastle | Premier League | ${ko(2)} | SCHEDULED` },
+  ];
+}
+
+function getMockFindEvents(team: string) {
+  const sat = nextSaturday();
+  const q   = team.toLowerCase();
+  return MOCK_FIXTURES
     .filter((f) => f.home.toLowerCase().includes(q) || f.away.toLowerCase().includes(q))
     .map((f) => {
-      const [day, h, m] = f.ko;
-      const kickoff = kickoffDate(sat, day, h, m);
-      return {
-        id:          f.id,
-        sport:       "soccer",
-        competition: f.competition,
-        name:        `${f.home} vs ${f.away}`,
-        start_time:  fmtTime(kickoff),
-        status:      "scheduled",
-        home_team:   f.home,
-        away_team:   f.away,
-        summary:     `${f.home} vs ${f.away} | ${f.competition} | ${fmtTime(kickoff)} | SCHEDULED`,
-      };
+      const [d,h,m] = f.ko;
+      const t = mockKickoff(sat, d, h, m);
+      return { id: f.id, sport: "soccer", competition: "Premier League",
+        name: `${f.home} vs ${f.away}`, start_time: t, status: "scheduled",
+        home_team: f.home, away_team: f.away,
+        summary: `${f.home} vs ${f.away} | Premier League | ${t} | SCHEDULED` };
     });
 }
 
-// ── Route handler ───────────────────────────────────────────────────────────
+// ── Route handler ─────────────────────────────────────────────────────────────
 
-function sleep(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
+function sleep(ms: number) { return new Promise((r) => setTimeout(r, ms)); }
 
 export async function GET(req: NextRequest) {
-  const p       = req.nextUrl.searchParams;
-  const action  = p.get("action")   ?? "events";
-  const eventId = p.get("event_id") ?? "pl_009";
-  const team    = p.get("team")     ?? "Arsenal";
+  const p      = req.nextUrl.searchParams;
+  const action = p.get("action")   ?? "events";
+  const team   = p.get("team")     ?? "Arsenal";
 
-  await sleep(450 + Math.random() * 150);
+  // Small artificial delay so the "Running…" state is visible
+  await sleep(300);
 
   switch (action) {
-    case "events":
-      return NextResponse.json({ ok: true, data: handleEvents() });
-    case "odds":
-      return NextResponse.json({ ok: true, data: handleOdds(eventId) });
-    case "value_bets":
-      return NextResponse.json({ ok: true, data: handleValueBets() });
-    case "find_events":
-      return NextResponse.json({ ok: true, data: handleFindEvents(team) });
+    case "events": {
+      const live = await liveEvents();
+      return NextResponse.json({ ok: true, live: live !== null, data: live ?? getMockEvents() });
+    }
+    case "odds": {
+      const live = await liveOdds();
+      return NextResponse.json({ ok: true, live: live !== null, data: live ?? getMockOdds() });
+    }
+    case "value_bets": {
+      const live = await liveValueBets(2);
+      return NextResponse.json({ ok: true, live: live !== null, data: live ?? getMockValueBets() });
+    }
+    case "find_events": {
+      const live = await liveFindEvents(team);
+      return NextResponse.json({ ok: true, live: live !== null, data: live ?? getMockFindEvents(team) });
+    }
     default:
       return NextResponse.json({ ok: false, error: "Unknown action" }, { status: 400 });
   }
