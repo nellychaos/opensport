@@ -215,6 +215,37 @@ async function liveFindEvents(team: string) {
     .map(mapFbdToEvent);
 }
 
+// ── Live handler: live scores ──────────────────────────────────────────────
+
+async function fetchFbdLiveMatches(): Promise<FbdMatch[]> {
+  if (!FBD_KEY) return [];
+  try {
+    const res = await fetch(
+      "https://api.football-data.org/v4/competitions/PL/matches?status=IN_PLAY",
+      { headers: { "X-Auth-Token": FBD_KEY }, next: { revalidate: 30 } }
+    );
+    if (!res.ok) return [];
+    const json = await res.json();
+    return (json.matches ?? []) as FbdMatch[];
+  } catch { return []; }
+}
+
+async function liveLiveScore() {
+  const matches = await fetchFbdLiveMatches();
+  if (matches.length === 0) return null;
+  const m = matches[0];
+  return {
+    event_id:  `fbd-${m.id}`,
+    match:     `${m.homeTeam.name} vs ${m.awayTeam.name}`,
+    home_team: m.homeTeam.name,
+    away_team: m.awayTeam.name,
+    home_score: m.score.fullTime.home ?? 0,
+    away_score: m.score.fullTime.away ?? 0,
+    status:    m.status,
+    competition: "Premier League",
+  };
+}
+
 // ── Mock fallback data (Matchweek 30, 14–16 Mar 2026) ────────────────────────
 
 const MOCK_FIXTURES = [
@@ -299,6 +330,27 @@ function getMockValueBets() {
   ];
 }
 
+function getMockLiveScore() {
+  // Liverpool vs Tottenham, second half in progress
+  const sat = nextSaturday();
+  const [d, h, m] = MOCK_FIXTURES[8].ko;
+  const ko = mockKickoff(sat, d, h, m);
+  const f = MOCK_FIXTURES[8];
+  return {
+    event_id:   "pl_009",
+    match:      `${f.home} vs ${f.away}`,
+    home_team:  f.home,
+    away_team:  f.away,
+    home_score: 2,
+    away_score: 1,
+    minute:     67,
+    status:     "IN_PLAY",
+    period:     "SECOND_HALF",
+    competition: "Premier League",
+    start_time: ko,
+  };
+}
+
 function getMockFindEvents(team: string) {
   const sat = nextSaturday();
   const q   = team.toLowerCase();
@@ -342,6 +394,10 @@ export async function GET(req: NextRequest) {
     case "find_events": {
       const live = await liveFindEvents(team);
       return NextResponse.json({ ok: true, live: live !== null, data: live ?? getMockFindEvents(team) });
+    }
+    case "live_score": {
+      const live = await liveLiveScore();
+      return NextResponse.json({ ok: true, live: live !== null, data: live ?? getMockLiveScore() });
     }
     default:
       return NextResponse.json({ ok: false, error: "Unknown action" }, { status: 400 });

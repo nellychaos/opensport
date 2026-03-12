@@ -16,6 +16,12 @@ npm-debug.log*
 # Vercel
 .vercel/
 
+# Claude worktrees and session files
+.claude/
+
+# TypeScript build cache
+tsconfig.tsbuildinfo
+
 # OS
 .DS_Store
 Thumbs.db

@@ -44,6 +44,19 @@ interface ValueBetRow {
   bookmaker: string;
 }
 
+interface LiveScoreResult {
+  event_id: string;
+  match: string;
+  home_team: string;
+  away_team: string;
+  home_score: number;
+  away_score: number;
+  minute?: number;
+  status: string;
+  period?: string;
+  competition: string;
+}
+
 type DemoState = "idle" | "loading" | "done" | "error";
 
 // ── Output renderers ────────────────────────────────────────────────────────
@@ -177,6 +190,44 @@ function FindEventsOutput({ data }: { data: EventRow[] }) {
   );
 }
 
+function LiveScoreOutput({ data }: { data: LiveScoreResult }) {
+  const isLive = data.status === "IN_PLAY" || data.status === "live";
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between">
+        <span className="text-xs font-medium text-stone-500">{data.competition}</span>
+        {isLive && (
+          <span className="flex items-center gap-1 text-xs font-semibold text-red-600 bg-red-50 border border-red-200 px-2 py-0.5 rounded-full">
+            <span className="w-1.5 h-1.5 rounded-full bg-red-500 animate-pulse" />
+            {data.minute ? `${data.minute}′` : "LIVE"}
+          </span>
+        )}
+      </div>
+      <div className="flex items-center justify-between gap-4 py-4 px-4 bg-white rounded-xl border border-stone-100">
+        <div className="text-center flex-1">
+          <p className="text-sm font-semibold text-stone-800">{data.home_team}</p>
+          <p className="text-4xl font-bold text-stone-900 mt-1">{data.home_score}</p>
+        </div>
+        <div className="text-center px-2">
+          <span className="text-lg font-light text-stone-300">–</span>
+          {data.period && (
+            <p className="text-[10px] text-stone-400 font-medium mt-1 tracking-wide">
+              {data.period.replace("_", " ")}
+            </p>
+          )}
+        </div>
+        <div className="text-center flex-1">
+          <p className="text-sm font-semibold text-stone-800">{data.away_team}</p>
+          <p className="text-4xl font-bold text-stone-900 mt-1">{data.away_score}</p>
+        </div>
+      </div>
+      <p className="text-xs text-stone-400 text-center">
+        Status: <span className="font-mono">{data.status}</span>
+      </p>
+    </div>
+  );
+}
+
 // ── Demo definitions ────────────────────────────────────────────────────────
 interface Demo {
   id: string;
@@ -278,6 +329,27 @@ const DEMOS: Demo[] = [
       <>{"    "}print(e.<Fn c="summary" />())</>,
     ],
     renderOutput: (data) => <FindEventsOutput data={data as EventRow[]} />,
+  },
+  {
+    id: "live_score",
+    title: "Live match score",
+    badge: "get_live_score()",
+    description: "Poll a live match for the current scoreline and minute. Returns real-time data from Football-Data.org when an API key is set — mock in-progress data otherwise.",
+    action: "live_score",
+    codeLines: [
+      <><Kw c="from" /> opensport.providers.mock <Kw c="import" /> MockProvider</>,
+      <>&nbsp;</>,
+      <>provider = <Fn c="MockProvider" />(seed=<Nm c="42" />)</>,
+      <>&nbsp;</>,
+      <><Cm c="# Get all currently live events" /></>,
+      <>live_events = provider.<Fn c="get_events" />(status=<St c='"live"' />)</>,
+      <>&nbsp;</>,
+      <><Cm c="# Fetch the current scoreline" /></>,
+      <>score = provider.<Fn c="get_live_score" />(live_events[<Nm c="0" />].id)</>,
+      <>&nbsp;</>,
+      <>print(<Fn c="f" /><St c={`"${"{score['home_team']}"} ${"{score['home_score']}"} – ${"{score['away_score']}"} ${"{score['away_team']}"} (${"{score['minute']}"}′)"`} />)</>,
+    ],
+    renderOutput: (data) => <LiveScoreOutput data={data as LiveScoreResult} />,
   },
 ];
 
@@ -413,9 +485,16 @@ function DemoCard({ demo }: { demo: Demo }) {
 
 // ── Main export ─────────────────────────────────────────────────────────────
 export default function DemoPlayground() {
+  const mainDemos = DEMOS.slice(0, 4);
+  const wideDemos = DEMOS.slice(4);
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      {DEMOS.map((demo) => (
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {mainDemos.map((demo) => (
+          <DemoCard key={demo.id} demo={demo} />
+        ))}
+      </div>
+      {wideDemos.map((demo) => (
         <DemoCard key={demo.id} demo={demo} />
       ))}
     </div>

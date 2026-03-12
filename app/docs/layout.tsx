@@ -26,6 +26,12 @@ const SIDEBAR = [
       { href: "/docs/mcp", label: "MCP Server" },
     ],
   },
+  {
+    section: "Project",
+    links: [
+      { href: "/docs/changelog", label: "Changelog" },
+    ],
+  },
 ];
 
 export default function DocsLayout({ children }: { children: React.ReactNode }) {
