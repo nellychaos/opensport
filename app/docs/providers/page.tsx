@@ -12,7 +12,8 @@ export default function Page() {
         <h1 className="text-3xl font-bold text-stone-900 mt-2 mb-3">{title}</h1>
         <p className="text-stone-500 text-lg leading-relaxed">
           A Provider fetches events and odds from a data source and normalises them into the core
-          models. Opensport ships six built-in providers. Swap any without changing your agent code.
+          models. Opensport ships built-in providers for every major source. Swap any without
+          changing your agent code.
         </p>
       </div>
 
@@ -64,6 +65,18 @@ export default function Page() {
             <td>None</td>
             <td><code>opensport[http]</code></td>
           </tr>
+          <tr>
+            <td><code>NBAProvider</code></td>
+            <td>NBA schedules, live scores, results + odds</td>
+            <td>None (odds optional)</td>
+            <td><code>opensport[nba]</code></td>
+          </tr>
+          <tr>
+            <td><code>KalshiProvider</code></td>
+            <td>CFTC binary markets — NBA, NFL, MLB, NHL</td>
+            <td>Required (KYC, US only)</td>
+            <td><code>opensport[http]</code></td>
+          </tr>
         </tbody>
       </table>
 
@@ -85,6 +98,8 @@ registry = ProviderRegistry.from_env()
 #   STAKE_API_KEY                          → StakeProvider
 #   CLOUDBET_API_KEY                       → CloudbetProvider
 #   POLYMARKET_ENABLED=1                   → PolymarketProvider
+#   NBA_PROVIDER_ENABLED=1                 → NBAProvider
+#   KALSHI_API_KEY                         → KalshiProvider
 
 provider = MultiProvider(registry)
 events = provider.get_events(sport="soccer")`}</code></pre>
@@ -335,6 +350,51 @@ if winner:
         <code>tennis</code>, <code>cricket</code>, <code>mma</code>, <code>boxing</code>. Unknown
         slugs are passed through as Polymarket native tag slugs (e.g. <code>ncaab</code>,{" "}
         <code>primera-a</code>).
+      </p>
+
+      {/* ------------------------------------------------------------------ */}
+      <h2>NBAProvider</h2>
+      <p>
+        Official NBA data via{" "}
+        <a href="https://github.com/swar/nba_api" target="_blank" rel="noopener noreferrer">nba_api</a>{" "}
+        (stats.nba.com + cdn.nba.com) combined with The Odds API for bookmaker odds.{" "}
+        <strong>No API key required</strong> for schedules, scores, and live data.
+        Set <code>ODDS_API_KEY</code> to enable bookmaker odds. Activate with{" "}
+        <code>NBA_PROVIDER_ENABLED=1</code>.
+      </p>
+
+      <pre><code>{`pip install 'opensport[nba]'`}</code></pre>
+
+      <pre><code>{`from opensport.providers.nba import NBAProvider
+
+# Schedules and live scores — no API key needed
+provider = NBAProvider()
+events = provider.get_events()                   # today's games
+live   = provider.get_live_score(events[0].id)  # {"home": 102, "away": 98, "period": 4}
+
+# Bookmaker odds — requires ODDS_API_KEY
+provider = NBAProvider(odds_api_key="your-odds-api-key")
+snapshot = provider.get_odds(events[0].id)
+winner   = snapshot.market("winner")
+print(winner.best_odds("Home"))
+
+# Auto-activate via environment variables:
+#   NBA_PROVIDER_ENABLED=1
+#   ODDS_API_KEY=...   (optional)`}</code></pre>
+
+      <table>
+        <thead><tr><th>Parameter</th><th>Default</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>odds_api_key</code></td><td><code>None</code></td><td>The Odds API key (optional — only needed for <code>get_odds()</code>). Falls back to <code>ODDS_API_KEY</code> env var.</td></tr>
+          <tr><td><code>timeout</code></td><td><code>10.0</code></td><td>HTTP timeout in seconds</td></tr>
+        </tbody>
+      </table>
+
+      <p>
+        Supported methods: <code>get_events()</code>, <code>get_odds()</code>,{" "}
+        <code>get_live_score()</code>, <code>get_past_events()</code>.
+        Event IDs use the <code>nba-</code> prefix (e.g. <code>nba-0022500890</code>).
+        All 30 teams are normalised to a canonical form for reliable odds matching.
       </p>
 
       {/* ------------------------------------------------------------------ */}
